@@ -184,9 +184,9 @@ patch:
   hwcore: { path: "../hwcore-fork" }
 ```
 
-解析结果固化进 `chip.lock`。
+解析结果固化进 `xirang.lock`。
 
-**一条硬规则**：同一依赖**不得同时以 git submodule 与 `git:` 出现**。是 submodule 就写成 `path:`——`.gitmodules` 管「目录从哪来」，`chip.lock` 管「解析到哪个目录」，两者管的是不同的事，同时用才会变成两个真相源。
+**一条硬规则**：同一依赖**不得同时以 git submodule 与 `git:` 出现**。是 submodule 就写成 `path:`——`.gitmodules` 管「目录从哪来」，`xirang.lock` 管「解析到哪个目录」，两者管的是不同的事，同时用才会变成两个真相源。
 
 ---
 

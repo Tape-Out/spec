@@ -5,7 +5,7 @@ The metadata and register specifications every IP in the Tape-Out library follow
 ![maturity](https://img.shields.io/badge/spec-v0.1-blue) ![license](https://img.shields.io/badge/license-Apache--2.0-blue)
 
 This repository holds the standard, not an implementation of it.
-[`chip`](https://github.com/Tape-Out/chip) is one implementation; anyone is free to write
+[`xirang`](https://github.com/Tape-Out/xirang) is one implementation; anyone is free to write
 another. IP repositories depend on this specification, never on the tooling — which is why
 it lives on its own rather than inside the tool.
 
