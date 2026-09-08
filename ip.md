@@ -12,6 +12,7 @@
 name: gpio
 version: 0.1.0          # 本包 semver
 spec: "0.1"             # 遵循的本规范版本
+kind: ip                # ip | library，省略即 ip
 
 identity:   { ... }     # 身份与目录元数据，对齐 ECOS
 contract:   { ... }     # 契约签名
@@ -23,6 +24,25 @@ emit:       [ ... ]     # 交付形态
 deps:       { ... }     # 依赖
 instances:  [ ... ]     # 可选。有它即为装配
 ```
+
+---
+
+## 一之二、包分两类
+
+`kind` 省略时是 `ip`。
+
+| `kind` | 会被例化 | 有契约 / 寄存器 / 面积 | 例 |
+|:--|:--:|:--:|:--|
+| **`ip`** | 是 | 是 | `gpio` `uart` `hart`；带 `instances:` 的即装配 |
+| **`library`** | **否** | **否** | `hwcore` `amba` `bridge` |
+
+**库包只贡献 BSV 源**：工具把它的 `bsv/` 加进编译搜索路径，仅此而已。它不进地址图、不算面积、不出现在装配层次里。
+
+因此库包**不得**出现 `contract` / `params` / `features` / `area` / `instances`，也不得有 `regmap.yaml`——写了不是无害的冗余，是误导读者以为它能被例化。工具对此报错。
+
+`instances[].of` 指向库包同样报错。
+
+> 工艺数据（`pdk`）不写 `ip.yaml`。它既不是 IP 也不是源码库，是**数据**，走专门的读取路径进层叠的最底层。
 
 ---
 
@@ -160,9 +180,15 @@ area:
 ```yaml
 emit:
   - kind: bsv                 # BSV 包，给 BSV 消费者
+    package: GpioGen          # BSV 包名
+    module: mkGpio            # 例化时调的模块
+    config_type: GpioCfg      # 特性结构体的类型名
+    interface: GpioIfc        # 接口类型名
   - kind: verilog-flat        # 扁平端口顶层，可独立综合与独立流片
     bus: apb4                 # 必选：扁平化必须选一种总线
 ```
+
+`kind: bsv` 那四个字段**都是必填**：装配器要靠它们生成 `import` 与例化语句，光有 `kind` 生成不出东西。这一条是竖切逼出来的——规范先写漏了，写生成器时才发现。
 
 `verilog-flat` 是三件事的组合：**契约 + 选一种总线 + 扁平化**。它必须带 `bus`，因为外人不讲我们的契约，只讲 APB4 或 AXI。
 
