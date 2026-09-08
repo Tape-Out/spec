@@ -2,7 +2,7 @@
 
 The metadata and register specifications every IP in the Tape-Out library follows.
 
-![maturity](https://img.shields.io/badge/spec-v0.1-blue) ![license](https://img.shields.io/badge/license-Apache--2.0-blue)
+![maturity](https://img.shields.io/badge/spec-v0.2-blue) ![license](https://img.shields.io/badge/license-Apache--2.0-blue)
 
 This repository holds the standard, not an implementation of it.
 [`xirang`](https://github.com/Tape-Out/xirang) is one implementation; anyone is free to write
@@ -33,7 +33,7 @@ it lives on its own rather than inside the tool.
 
 规范单独定版，与任何实现的版本无关。`ip.yaml` 里的 `spec:` 字段声明遵循哪一版。
 
-当前 **v0.1**。语义有破坏性改动时进 minor，加字段进 patch。
+当前 **v0.2**。语义有破坏性改动时进 minor，加字段进 patch。
 
 ## License
 
