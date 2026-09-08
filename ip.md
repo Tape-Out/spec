@@ -36,7 +36,17 @@ instances:  [ ... ]     # 可选。有它即为装配
 | **`ip`** | 是 | 是 | `gpio` `uart` `hart`；带 `instances:` 的即装配 |
 | **`library`** | **否** | **否** | `hwcore` `amba` `bridge` |
 
-**库包只贡献 BSV 源**：工具把它的 `bsv/` 加进编译搜索路径，仅此而已。它不进地址图、不算面积、不出现在装配层次里。
+```yaml
+name: hwcore
+kind: library
+lang: bsv          # bsv | bh | verilog | vhdl | sv | chisel | spinal，省略即 bsv
+```
+
+**库包只贡献源码**：工具把它的源目录加进编译搜索路径，仅此而已。它不进地址图、不算面积、不出现在装配层次里。
+
+**语言不限于 BSV。** 规范对源语言是开放的——Verilog、VHDL、SystemVerilog、Chisel、SpinalHDL 都可以，用 `lang:` 声明，工具按语言选对应的编译前端。**当前实现只支持 BSV 与 BH**，其余语言的前端等到真有包需要时再接。
+
+我们自己写的 IP **在 BSV 与 BH 之间按 IP 择优**：看哪一种更适合这个 IP 的功能与特性，哪一种更易读、更好组件化与参数化。两者同一个编译器、同一套语义，只是语法不同，可以混用。
 
 因此库包**不得**出现 `contract` / `params` / `features` / `area` / `instances`，也不得有 `regmap.yaml`——写了不是无害的冗余，是误导读者以为它能被例化。工具对此报错。
 
