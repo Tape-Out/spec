@@ -286,6 +286,8 @@ emit:
     config_type: GpioCfg      # 特性结构体的类型名
     interface: GpioIfc        # 接口类型名
     ctrl: regs                # 契约子接口叫什么，默认 regs
+    ctrl_slow: slow           # 会停顿的那个控制口（可选，与 slow_when 成对）
+    slow_when: sync           # 哪个特性开着时用会停顿的那个口
     pins:                     # 透传的子接口，装配与包装层照它生成
       - { name: pins, type: GpioPins, targs: [numPins] }
   - kind: verilog-flat        # 扁平端口顶层，可独立综合与独立流片
@@ -297,6 +299,12 @@ emit:
 `targs` 写旋钮名或数字，求解后取值。
 
 `kind: bsv` 那四个字段**都是必填**：装配器要靠它们生成 `import` 与例化语句，光有 `kind` 生成不出东西。这一条是竖切逼出来的——规范先写漏了，写生成器时才发现。
+
+**`ctrl_slow` 与 `slow_when` 管的是同一个 IP 的两副面孔。** 同步存储（SRAM 宏、ROM 宏、缓存）答不了同一拍，它的控制口是 `RegTarget` 而不是 `RegIf`；而同一个包在异步形态下仍然是 `RegIf`。两个口都在接口上不随配置变形，用哪个由 `slow_when` 指的那个特性决定：包装层按它选绑定器，装配按它决定这个实例进零等待那条向量还是会停顿那条。
+
+两个键**必须成对**，且 `slow_when` 必须指向这个包真有的特性——只给一个，选口的条件就没了；指向不存在的特性，选出来的永远是同一个口而没人报错。**这两条都是硬错误，不是警告。**
+
+如果没有 `ctrl_slow`，这个 IP 就只有一副面孔，一切照旧。
 
 `verilog-flat` 是三件事的组合：**契约 + 选一种总线 + 扁平化**。它必须带 `bus`，因为外人不讲我们的契约，只讲 APB4 或 AXI。
 
