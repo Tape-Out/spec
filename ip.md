@@ -239,7 +239,7 @@ area:
 area:
   base:     { per: pins, points: { 8: 612.36, 16: 1183.84, 32: 2413.60, 64: 4522.84 } }
   params:
-    funcs:  { points: { 2: -128.52, 4: 0.0, 8: 799.96, 16: 2266.60 } }
+    funcs:  { points: { 2: -410.20, 4: 0.0, 8: 768.32, 16: 2234.96 } }
   margin: 0.008
   model: points-additive
 features:
