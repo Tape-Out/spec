@@ -334,6 +334,42 @@ emit:
 
 `verilog-flat` 是三件事的组合：**契约 + 选一种总线 + 扁平化**。它必须带 `bus`，因为外人不讲我们的契约，只讲 APB4 或 AXI。
 
+### `kind: foreign` —— 别人的 RTL
+
+我们自己只写 BSV 与 BH，但要接的东西是 Verilog、SystemVerilog、VHDL、Chisel 与 SpinalHDL 出来的网表。这些一律按**黑盒**收：不解析它的源码，只收一份声明，把它当成一个已知形状的组件放进装配。
+
+```yaml
+emit:
+  - kind: foreign
+    lang: verilog             # 与顶层 lang 同一张表：verilog | sv | vhdl | chisel | spinal
+    top: uart_core            # 确切的顶层模块名，大小写照抄
+    rtl: [rtl/uart_core.v, rtl/uart_rx.v]   # 综合视图，路径相对包根
+    sim: [sim/uart_model.v]                 # 仿真视图，不写就同 rtl
+    params:                   # 它的参数 <- 我们的旋钮，或一个字面值
+      DATA_BITS: dataBits
+      FIFO_DEPTH: 8
+    clock: { port: clk }
+    reset: { port: rst_n, active: low, sync: true }
+    ports:
+      - { endpoint: ctrl, kind: transaction, role: target, profile: apb4,
+          prefix: p }                       # psel penable pwrite …
+      - { endpoint: pins, kind: physical, type: UartPins,
+          map: { tx: o_tx, rx: i_rx } }
+      - { endpoint: irq, kind: event, role: source, map: { irq: o_irq } }
+    limits:
+      - 数据位固定 8
+```
+
+**每一项都是「接得上」必需的，缺一项就接不上**：顶层名与文件给出源码闭包；`params` 说清我们的旋钮投影到它的哪个参数；`clock` 与 `reset` 说清域与复位极性（写反了仿真能过、上板不工作）；`ports` 把它的端口名对到我们的端点上——整组协议用 `profile` 加 `prefix`，零散的线逐根 `map`；`limits` 写明它做不到什么。
+
+**两份视图是有意分开的。** 仿真那份常带 `initial`、带延时、带只有仿真器认的模型，综合那份不能有。合成一份的代价是：要么仿真不准，要么综合报一堆看不懂的错。
+
+**回执**：`ran build` 真正例化它时，要拿**展开之后的**端口表回来核对——声明里写的每个端口名与位宽都必须对得上。`ran check` 只做静态核对（文件在不在、`params` 的键有没有、端点形状全不全），因为那一步还没有工具去展开参数。
+
+**反例**：把 `o_tx` 写成 `o_txd`，回执那一步必须报「黑盒 `uart_core` 没有端口 `o_txd`」并指到 `ip.yaml` 的那一行；`params` 里写一个它没有的参数，同样报错。两条都对不上还能构建，说明这份声明形同虚设。
+
+**它不生成任何东西。** `kind: foreign` 的包没有我们生成的顶层，装配把它当既成事实接线。所以它也**不进价目表的预测**：面积只能实测，`area.base` 只许写定值，写曲线是假的。
+
 **扁平化不是免费的**：把综合边界推到契约层，对外线位实测从 475 涨到 762（+60%），多出来的全是方法变端口后的 `RDY`/`EN` 握手线。代价随 `contract.ctrl.shape` 变——`flat` 形态近乎恒等变换，`server` 形态要把两组握手都摊成端口。**这笔钱在配置时就该看得见**，所以它进价目表。
 
 ---
