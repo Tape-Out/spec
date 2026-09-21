@@ -374,6 +374,34 @@ emit:
 
 ---
 
+## 六之二、`targets` —— 怎么构建
+
+`emit` 说的是**交付什么形态**，`targets` 说的是**怎么构建它**。两者不是一回事：`uart` 一个包既出寄存器组也出扁平端口顶层，是两个目标共用一份 `emit`。
+
+```yaml
+targets:
+  regs: { driver: regs }
+  flat: { driver: flat }
+```
+
+| driver | 做什么 |
+|:--:|:--|
+| `regs` | 从 `regmap.yaml` 生成寄存器组与一致性测试台 |
+| `flat` | 生成扁平端口顶层，按 `emit` 里那一段选定的总线 |
+| `bsv` | 只编这个包的 BSV 模块并跑它自己的测试台——没有寄存器图也不扁平化的那类 |
+| `assembly` | 按 `instances` 生成顶层 |
+| `library` | 只编源码，不例化；面积走 `area.probe` |
+| `foreign` | 什么都不生成，黑盒是既成事实 |
+| `none` | 没有可构建的东西 |
+
+**不写就按树上有什么推断**，与从前一样。推断本身没问题，**把推断藏在别处才有问题**：在此之前这件事是流水线 `grep ip.yaml` 猜的——`kind: library` 归库、有 `instances:` 归装配、有 `verilog-flat` 归扁平、其余一律算「有寄存器图」。于是 `rvdbg` 这种只出 BSV 的调试模块落进最后一档，跑的是它根本没有的寄存器一致性测试。
+
+**写出来的要对得上树上真有的东西**：说 `assembly` 就得真有 `instances`，说 `regs` 就得真有 `regmap.yaml`，说 `flat` 就得真有 `verilog-flat` 段。对不上当场报——**一句对不上的声明比猜还糟**，因为读的人会信它。
+
+**工具要答得出**：`xirang inspect <包> -f json` 的 `targets` 字段出这张表，流水线问工具，不再自己猜。
+
+---
+
 ## 七、`deps` —— 依赖
 
 照搬 cargo 的来源模型：
