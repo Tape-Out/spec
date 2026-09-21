@@ -146,7 +146,7 @@ mems:
 
 | 产物 | 路径 | 形状 |
 |:--|:--|:--|
-| BSV 寄存器文件 | `bsv/<Ip>Regs.bsv` | 模块 `mk<Ip>Regs`，实现 `ip.yaml` 里 `contract.ctrl.shape` 指定的形态 |
+| BSV 寄存器文件 | `hwsrc/<Ip>Regs.bsv` | 模块 `mk<Ip>Regs`，实现 `ip.yaml` 里 `contract.ctrl.shape` 指定的形态 |
 | C 头 | `sw/include/<ip>.h` | 偏移宏 + 每字段的 `_SHIFT` / `_MASK` |
 | 文档 | `docs/regmap.md` | 寄存器表 |
 | 地址元数据 | `build/regmap.json` | 装配的地址分配与重叠检查读它 |
