@@ -1,48 +1,22 @@
-# spec
+# xrspec
 
-The metadata and register specifications every IP in the Tape-Out library follows.
+Tape-Out 的 IP 元数据与寄存器规范。
 
-![maturity](https://img.shields.io/badge/spec-v0.2.3-blue) ![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0%20OR%20MulanPSL--2.0-blue)
+![spec](https://img.shields.io/badge/spec-v0.2.3-blue) ![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0%20OR%20MulanPSL--2.0-blue)
 
-This repository holds the standard, not an implementation of it.
-[`xirang`](https://github.com/Tape-Out/xirang) is one implementation; anyone is free to write
-another. IP repositories depend on this specification, never on the tooling — which is why
-it lives on its own rather than inside the tool.
+| 文档 | 写了什么 |
+| :--: | :--: |
+| [`ip.md`](ip.md) | 身份 · 契约签名 · 旋钮与约束 · 面积价目表 · 交付形态 · 依赖 · 装配 |
+| [`regmap.md`](regmap.md) | 寄存器与字段语义 · feature 门控 · 存储块 |
+| [`contract.md`](contract.md) | 两种契约形态 · 选用规则 · 编写规范 |
+| [`maturity.md`](maturity.md) | 五档成熟度，及与 ECOS 目录词汇的映射 |
 
-| 文档 | 内容 |
-| :--: | :-- |
-| [`ip.md`](ip.md) | `ip.yaml`：身份 · 契约签名 · 旋钮与约束 · 面积价目表 · 交付形态 · 依赖 · 装配 |
-| [`regmap.md`](regmap.md) | `regmap.yaml`：寄存器与字段语义 · feature 门控 · 存储块 |
-| [`contract.md`](contract.md) | 两种契约形态、选用规则、编写规范 |
-| [`maturity.md`](maturity.md) | 五档成熟度及与 ECOS 目录词汇的映射 |
-
-## 它借了谁
-
-不重造已有的语义，只在别人留白的地方引申。
-
-| 层 | 语义来自 | 我们添的 |
-| :-- | :-- | :-- |
-| 寄存器字段 | **SystemRDL 2.0**（属性名原样沿用） | feature 门控 · 存储块与宏选型 |
-| 旋钮约束 | **kconfig** 的 `choice` / `range` / `depends on` | 会报错而不是硬开的 `constraints`（不借 `select`） |
-| 依赖模型 | **cargo** 的 `path` / `git`+`rev` / `patch` / lock | 与 git submodule 的边界规则 |
-| 元数据字段 | **ECOS** 的 `ip.yaml` | 契约签名 · 面积价目表 · 参数范围 · 依赖锁 |
-
-范式取 OpenAPI 3 与 JSON Schema 的关系：OpenAPI 不重造一套校验语言，它**就是** JSON Schema 再加上自己需要的那部分。
+语义取自 SystemRDL 2.0、kconfig、cargo 与 ECOS，只在留白处引申。
 
 ## 版本
 
-规范单独定版，与任何实现的版本无关。`ip.yaml` 里的 `spec:` 字段声明遵循哪一版。
+`ip.yaml` 的 `spec:` 字段声明遵循哪一版。当前 v0.2.3，语义破坏进 minor，加字段进 patch。
 
-当前 **v0.2.3**。语义有破坏性改动时进 minor，加字段进 patch。
+## 许可证
 
-## License
-
-任选其一：
-
-- [MIT](LICENSE-MIT)
-- [Apache 2.0](LICENSE-APACHE)
-- [木兰宽松许可证 第2版](LICENSE-MULAN)
-
-`SPDX-License-Identifier: MIT OR Apache-2.0 OR MulanPSL-2.0`
-
-除非另行说明，你提交的贡献按上述三者同时授权，不附加其他条件。
+任选其一：[MIT](LICENSE-MIT) · [Apache 2.0](LICENSE-APACHE) · [木兰宽松许可证 第2版](LICENSE-MULAN)
