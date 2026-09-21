@@ -11,7 +11,7 @@ Tape-Out 的 IP 元数据与寄存器规范。
 | [`contract.md`](contract.md) | 两种契约形态 · 选用规则 · 编写规范 |
 | [`maturity.md`](maturity.md) | 五档成熟度，及与 ECOS 目录词汇的映射 |
 
-语义取自 SystemRDL 2.0、kconfig、cargo 与 ECOS，只在留白处引申。
+语义取自 SystemRDL 2.0、kconfiglib、cargo 与 ECOS，只在留白处引申。
 
 ## 版本
 

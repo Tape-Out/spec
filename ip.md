@@ -2,7 +2,7 @@
 
 一个包一份 `ip.yaml`。它同时承担两件事：**描述这个包**（契约、旋钮、依赖、面积），以及在带 `instances:` 时**描述一次装配**。叶子 IP 与整颗 SoC 用的是同一份 schema，只差有没有 `instances:` 段。
 
-元数据字段对齐 ECOS 的 `ip.yaml`；旋钮的约束语义取自 kconfig；依赖模型取自 cargo。三处借鉴各管一层，互不覆盖。
+元数据字段对齐 ECOS 的 `ip.yaml`；旋钮的约束语义取自 kconfiglib；依赖模型取自 cargo。三处借鉴各管一层，互不覆盖。
 
 ---
 
@@ -156,11 +156,11 @@ features:
   debounce:
     type: bool
     default: false
-    depends: [bidir]                  # kconfig 的 depends on
+    depends: [bidir]                  # kconfiglib 的 depends on
     area: { fixed: 29.7, per: numPins, k: 30.41 }
 
   drive:
-    type: choice                      # kconfig 的 choice
+    type: choice                      # kconfiglib 的 choice
     values: [none, two-level, four-level]
     default: none
     area:
@@ -187,7 +187,7 @@ constraints:
     msg: 去抖作用在输入通路上，需要 bidir 打开
 ```
 
-借 kconfig 的 `depends on`、`choice`、`range`；**不借 `select`**。`select` 能强开一个依赖并不满足的符号，是 kconfig 公认最烂的部分。这里的 `constraints` 在不满足时**报错并指出是哪条**，不静默改值。
+借 kconfiglib 的 `depends on`、`choice`、`range`；**不借 `select`**。`select` 能强开一个依赖并不满足的符号，是 kconfig 公认最烂的部分。这里的 `constraints` 在不满足时**报错并指出是哪条**，不静默改值。
 
 ---
 
