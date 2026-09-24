@@ -1,4 +1,4 @@
-# `ip.yaml` 规范 v0.2.4
+# `ip.yaml` 规范 v0.2.5
 
 一个包一份 `ip.yaml`。它同时承担两件事：**描述这个包**（契约、旋钮、依赖、面积），以及在带 `instances:` 时**描述一次装配**。叶子 IP 与整颗 SoC 用的是同一份 schema，只差有没有 `instances:` 段。
 
@@ -504,6 +504,108 @@ emit:
 
 **它不生成任何东西。** `kind: foreign` 的包没有我们生成的顶层，装配把它当既成事实接线。所以它也**不进价目表的预测**：面积只能实测，`area.base` 只许写定值，写曲线是假的。
 
+**生成器类的上游**（先跑它自己的生成器，才有 RTL 或头文件）写 `setup: <任务名>`，指向 `tasks:` 里的那条任务。缺文件时报「它是生成物，先跑 `ran run <包> <任务>`」，**但不代跑**：任务不是隐藏的构建步骤。
+
+#### 源码从哪来：五种写法
+
+`rtl`（以及下面各视图里的 `rtl`）是一张条目表，每条是下面五种之一，可以混用：
+
+```yaml
+rtl:
+  - rtl/core.sv                                        # 1. 一个文件
+  - { path: rtl/fpu_dpi.sv, when: { fpu: DPI } }       # 2. 带条件的文件
+  - { glob: "hw/rtl/**/*.sv", exclude: ["hw/rtl/afu/**"] }   # 3. glob
+  - { regex: "^hw/rtl/(core|cache)/VX_.*\\.sv$" }      # 4. 正则，匹配相对包根的路径
+  - { flist: core/Flist.cva6, env: { CVA6_REPO_DIR: third_party/cva6 } }   # 5. Flist
+```
+
+五种都可以带 `when:`，旋钮不满足时整条跳过。命令行 `--flist <文件>` 与第 5 种同义，可重复写，追加在清单条目之后（`-f` 已是 `--format`，不复用）。
+
+**glob 与正则扫到什么就编什么**，不替用户挑「只编用到的」。扫多了是配置的事：把整个目录扫进来，用不上的文件照样要编得过。
+
+**Flist 照工具惯例读**：认源文件、`+incdir+`、`+define+`、`-f`／`-F` 嵌套、`-y` 与 `+libext+`。`-f` 引用的相对路径以当前目录为基准，`-F` 以那份清单自己所在目录为基准。`${变量}` 由 `env:` 给值。Flist 里的 `+define+`、`+incdir+` 与清单的 `defines`、`includes` 冲突时**清单优先**，被覆盖的逐条写进回执。
+
+**顺序**：展开出来的文件去重，由工具按 slang 算出的依赖把包排到前面，结果记进锁。slang 不在乎顺序，yosys 与 Verilator 在乎；**各工具拿的是同一份排好的清单**，不各排各的。
+
+**反例**：
+- glob 或正则一个文件都没匹配到：`XR-SRC-001`，error，指到那一条。
+- Flist 里的 `${变量}` 在 `env:` 里没有值：`XR-SRC-002`，error。静默展开成空串会把路径接到根目录上。
+- Flist 里的 `+define+X=1` 被清单的 `X: 2` 覆盖：`XR-SRC-003`，info，两个值都写进回执。
+
+#### 视图：`rtl`、`sim`、`syn`
+
+同一个包，综合与仿真常常要不同的宏、目录与文件：Vortex 综合要 `SYNTHESIS ASIC YOSYS` 加一个存储空壳库，仿真要 `SIMULATION SV_DPI` 加 DPI 头文件的目录。视图就是一份叠在基础配置上的覆盖：
+
+```yaml
+- kind: foreign
+  top: Vortex
+  rtl: [{ glob: "hw/rtl/**/*.sv", exclude: ["hw/rtl/afu/**"] }]
+  defines: [VX_CFG_XLEN=32]            # 基础：三个视图共用
+  includes: [hw/rtl]
+  views:
+    sim: { defines: [SIMULATION, SV_DPI], includes: [hw/dpi] }
+    syn: { defines: [SYNTHESIS, ASIC, YOSYS], rtl: [{ glob: "hw/syn/libs/no_mem/*.v" }] }
+```
+
+- **名字只有三个**：`rtl` 是基础，`sim`、`syn` 叠在它上面。不许自造视图名，免得名字泛滥。
+- **照层叠覆盖**：列表追加在基础之后；宏与基础同名时，视图里的值为准。要整份换掉，写 `replace: [rtl]`。
+- **旧写法照读**：`sim: [文件…]` 等价于 `views: { sim: { rtl: [文件…], replace: [rtl] } }`，也就是「仿真视图，不写就同 rtl」原来的意思。
+- **重流程只跑它需要的那一份**：综合与面积走 `syn`，仿真走 `sim`，**不跟旋钮做叉乘**。展开与回执是秒级，每个视图各跑一次无所谓；综合与全量仿真可能是几天，翻倍不行。
+
+**反例**：写 `views: { fpga: … }`，`XR-VIEW-001`，error，并列出三个合法的名字。
+
+#### 宏的投影：三种写法都有
+
+`defines` 可以是列表（字面宏），也可以是表。表里每个宏由旋钮投影出来，**三种写法都支持，用户任选**：
+
+```yaml
+defines:
+  VX_CFG_NUM_CORES: cores               # 值宏：-DVX_CFG_NUM_CORES=<cores>
+  VX_CFG_L2_ENABLE: { when: l2 }        # 开关宏：l2 开着才定义，不带值
+  VX_CFG_FPU_TYPE: fpu                  # 档位的值宏：-DVX_CFG_FPU_TYPE=DPI
+  "VX_CFG_FPU_TYPE_{{fpu}}": true       # 名字带值的选择宏：-DVX_CFG_FPU_TYPE_DPI
+  VX_CFG_TCU_IMPL: { from: tcu, map: { TFR: tfr_core, DSP: dsp_core, BHF: null } }   # 逐档映射
+```
+
+- **开关宏只能跟布尔旋钮**：`` `ifdef `` 判的是「定义没定义」，给它 `=0` 反而是打开。
+- **名字带值的选择宏**复用 `{{…}}` 占位符，与 `tasks:`、`ran new` 同一套，不另起语法。它解决的是这一类上游：RTL 按 `` `ifdef VX_CFG_FPU_TYPE_DPI `` 选实现，只给值宏选不中。
+- **逐档映射**给每一档一个宏值；`null` 表示这一档不定义。**每个合法档位都要写到**，漏一档就报错。
+- 同一个档位旋钮可以同时出值宏与选择宏：上游两种都认时就两种都给。
+
+**反例**：
+- `{{…}}` 里写了不存在的旋钮，或者写的不是档位旋钮：`XR-MACRO-001`，error。
+- 逐档映射漏了一个合法档位：`XR-MACRO-002`，error，列出漏的那几档。
+- `{when: …}` 指向非布尔旋钮：error，这一条从前就有。
+
+#### 回执的两层检查
+
+回执拿展开之后的设计回来核对，除了上面的端口与参数，还有两层：
+
+**通用检查**：顶层的非打包数组端口，长度解出 0 就是 `XR-RCPT-001`，error。「一个存储口都没有」这种配置会展开成功，Verilator 也收零长度数组，不拦就一路静默下去。
+
+**探针**：旋钮若不落在顶层参数上（比如落在包的 localparam 上），光比顶层看不出它生效没有。写探针：
+
+```yaml
+receipt:
+  - { symbol: "VX_gpu_pkg::NUM_SOCKETS", expect: { eq: "{{cores}}" } }
+  - { symbol: "VX_gpu_pkg::VX_MEM_PORTS", expect: { ge: 1 } }
+```
+
+`expect` 认 `eq`、`ne`、`ge`、`le`、`in`，值可以用 `{{旋钮}}` 取当前配置。**只查通用检查不够**：打包端口写成 `[N-1:0]`，N 为 0 时是 `[-1:0]`，两位宽，看宽度发现不了；这类要靠探针。
+
+**反例**：
+- 用错了生成器的求值方式，存储口数成了 0：`XR-RCPT-001` 必须报；写了 `ge: 1` 的探针同时报 `XR-RCPT-002`。
+- 上游把 `VX_MEM_PORTS` 改了名：`XR-RCPT-003`，error，「探针找不到符号」。探针失效时要明确报错，不许当成通过。
+
+#### 本版实现到哪
+
+规范一次写全，工具分档实现。**用到还没实现的写法，报 `XR-SPEC-001`「已声明，本版还不能构建」**，不报语法错：
+
+| 写法 | 状态 |
+|:--|:--:|
+| 单个文件、带 `when` 的文件、`sim` 列表 · `defines` 的列表、值宏、开关宏 · `includes` · `setup` · 顶层端口与参数的回执 | 已实现 |
+| glob · 正则 · Flist 与 `--flist` · `views` · 选择宏 · 逐档映射 · `XR-RCPT-001` · 探针 · `slang:` 诊断与 `allow`／`deny` · 配置导入与补全 | 已声明，未实现 |
+
 **扁平化不是免费的**：把综合边界推到契约层，对外线位实测从 475 涨到 762（+60%），多出来的全是方法变端口后的 `RDY`/`EN` 握手线。代价随 `contract.ctrl.shape` 变——`flat` 形态近乎恒等变换，`server` 形态要把两组握手都摊成端口。**这笔钱在配置时就该看得见**，所以它进价目表。
 
 ---
@@ -687,6 +789,21 @@ diagnostics:
 | `XR-CONV-001` | 位宽转换 | `error` |
 | `XR-CONV-002` | 突发或原子性被摊平 | `error` |
 | `XR-CDC-001` | 两端时钟域不同而没写 `cdc` | `error` |
+| `XR-SRC-001` | glob 或正则一个文件都没匹配到 | `error` |
+| `XR-SRC-002` | Flist 里的 `${变量}` 没有值 | `error` |
+| `XR-SRC-003` | Flist 的宏或目录被清单覆盖 | `info` |
+| `XR-VIEW-001` | 视图名不是 `rtl`、`sim`、`syn` | `error` |
+| `XR-MACRO-001` | `{{…}}` 指向不存在的旋钮，或不是档位旋钮 | `error` |
+| `XR-MACRO-002` | 逐档映射漏了合法档位 | `error` |
+| `XR-RCPT-001` | 顶层非打包数组端口长度为 0 | `error` |
+| `XR-RCPT-002` | 探针的期望不满足 | `error` |
+| `XR-RCPT-003` | 探针找不到符号 | `error` |
+| `XR-DIAG-001` | 放宽了一条前端放不宽的诊断 | `error` |
+| `XR-CFG-001` | 导入的值不在取值域里 | `error` |
+| `XR-CFG-002` | 导入的键不认识 | `warn` |
+| `XR-CFG-003` | 有新旋钮要回答，但不在终端里 | `error` |
+| `XR-SPEC-001` | 用了规范里有、本版工具还没实现的写法 | `error` |
+| `slang:<诊断名>` | 外来 RTL 的语言问题，名字照 slang | `error` |
 | `XR-AREA-001` | 价目表量的是另一份生成产物 | `info` |
 | `XR-AREA-002` | 参数改了，量出来的面积不变 | `info` |
 | `XR-AREA-003` | 改这个旋钮，面积预测不动 | `info` |
@@ -706,6 +823,26 @@ links:
     to: seg_apb
     allow: [XR-CONV-001]      # 64 位下挂 32 位，知道自己在做什么
 ```
+
+### 外来 RTL 的语言兼容
+
+外来 RTL 不一定完全合 IEEE 1800。前端是 slang，它报的每一条错误按 `slang:<诊断名>` 进闸门，默认 `error`。包级照 Rust 的 `#[allow]`、`#[deny]` 放宽或收紧：
+
+```yaml
+diagnostics:
+  allow: [slang:UsedBeforeDeclared, slang:SysFuncHierarchicalNotAllowed]
+```
+
+`allow` 等于 `info`（照跑，留在报告里），`deny` 等于 `error`，`warn` 居中；也可以像上面那样逐条写级别。
+
+- **放宽由工具翻译成前端的兼容开关**，开了哪些写进回执：`UsedBeforeDeclared` 对应 slang 的 `--allow-use-before-declare`，`SysFuncHierarchicalNotAllowed` 与 `ConstEvalHierarchicalName` 对应 `--allow-hierarchical-const`。对应表是数据，新加一条不改结构。
+- **开关作用于这个包的整次展开**，放不到其中几个文件上。回执本来就一个包一个包地展开，所以放宽不会漏到别的包。
+- **后果由声明的人承担。本组织自己的包默认最严**：除特殊情况并写明理由外，不放宽。
+- **前端没有开关的诊断放不宽**：写了报 `XR-DIAG-001`。「声明放宽了、实际仍然报错」比不声明更让人糊涂。
+
+**反例**：
+- 没打补丁的 Vortex 不写 `allow`：报 `slang:UsedBeforeDeclared` 并指到源文件的行。写了 `allow`：照跑，回执里列出 `--allow-use-before-declare`。
+- `allow: [slang:UnknownModule]`：slang 没有让它放过未定义模块的开关，报 `XR-DIAG-001`。
 
 ### 不许把「没量」说成「过了」
 
@@ -731,6 +868,28 @@ links:
 工具必须能对任意一个旋钮回答五问：**最终值 · 谁定的（层/文件/行）· 被压掉的候选及其来源 · 是否被约束强制 · 这个取值花了多少面积**。
 
 **生成钩子不得改写旋钮取值**，只能往下游添产物与声明。理由不是洁癖：钩子一旦能回改配置，上面那五问就答不了了。
+
+---
+
+## 九之二、配置导入与补全
+
+配置要能像 Linux 的 defconfig 一样：拿来一份，改其中一部分，余下的按默认补全，再存成一份小文件分享出去。四个命令照 kconfiglib 取名：
+
+| 命令 | 做什么 |
+|:--:|:--|
+| `ran config import <文件> [--format …]` | 读入一份配置，作为一层取值 |
+| `ran config olddefconfig` | 没给值的旋钮按默认补全；不认识的键丢掉，并逐条报告 |
+| `ran config oldconfig` | 新出现的旋钮逐个问。不在终端里时报 `XR-CFG-003` 并列出要答的全部，不挂着等输入 |
+| `ran config savedefconfig -o <文件>` | 只存与默认值不同的旋钮，次序固定 |
+
+- **导入的配置落在第 4 层**（workspace 默认）。导入多份时后导入的为准。`config --why` 要答得出某个值来自哪份文件的哪一行。
+- **格式按读入器扩展**：我们自己的（`savedefconfig` 出的 YAML）、kconfig 的 `.config`、上游格式。上游格式的**第一个是 Vortex 的 `VX_config.toml`**：取字面值的键；`expr:` 开头的是由别的项算出来的，跳过并记 info。新增一种格式只加一个读入器。
+- **往返一致**：对任何合法配置 `x`，`import(savedefconfig(x))` 解出来与 `x` 相同。
+
+**反例**：
+- 导入文件里某个值不在取值域：`XR-CFG-001`，error，指到文件与行。
+- 导入文件里有不认识的键：`XR-CFG-002`，warn；`olddefconfig` 丢掉它并列出。
+- 把 `savedefconfig` 出的文件里一个值改回默认值，再存一次，那一行必须消失。
 
 ---
 
